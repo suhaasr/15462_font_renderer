@@ -241,9 +241,55 @@ void SoftwareRendererImp::rasterize_point( float x, float y, Color color ) {
 void SoftwareRendererImp::rasterize_line( float x0, float y0,
                                           float x1, float y1,
                                           Color color) {
-
   // Task 2: 
   // Implement line rasterization
+  int roundX0 = (int) round(x0);
+  int roundY0 = (int) round(y0);
+  int roundX1 = (int) round(x1);
+  int roundY1 = (int) round(y1);
+  int epsilon = 0;
+  int swap, deltaX, deltaY, currX, currY;
+
+  //Make sure the points are left to right
+  if (roundX1 <= roundX0)
+  {
+    swap = roundX0; roundX0 = roundX1; roundX1 = swap;
+    swap = roundY0; roundY0 = roundY1; roundY1 = swap;
+  }
+  deltaY = roundY1 - roundY0;
+  deltaX = roundX1 - roundX0;
+  
+  if (deltaY >= 0) //Line has positive or horizontal slope
+  {
+    if (deltaX >= deltaY) //Line moves more right than up
+    {
+      currY = roundY0;
+      for (currX = roundX0; currX <= roundX1; currX++)
+      {
+        rasterize_point(currX,currY,color);
+        epsilon += deltaY;
+        if((epsilon << 1) >= deltaX)
+        {
+          currY ++; epsilon -= deltaX;
+        }
+      }
+    }
+    else //Line moves more up than right, so use y as the primary loop var
+    {
+      currX = roundX0;
+      for (currY = roundY0; currY <= roundY1; currY++)
+      {
+        rasterize_point(currX,currY,color);
+        epsilon += deltaX;
+        if((epsilon << 1) >= deltaY)
+        {
+          currX ++; epsilon -= deltaY;
+        }
+      }
+    }
+  }
+
+
 }
 
 void SoftwareRendererImp::rasterize_triangle( float x0, float y0,
