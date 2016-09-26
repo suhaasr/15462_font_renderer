@@ -251,17 +251,18 @@ void SoftwareRendererImp::rasterize_line( float x0, float y0,
   int swap, deltaX, deltaY, currX, currY;
 
   //Make sure the points are left to right
-  if (roundX1 <= roundX0)
+  if (roundX1 < roundX0 || (roundX1 == roundX0 && roundY0 > roundY1))
   {
     swap = roundX0; roundX0 = roundX1; roundX1 = swap;
     swap = roundY0; roundY0 = roundY1; roundY1 = swap;
   }
+
   deltaY = roundY1 - roundY0;
   deltaX = roundX1 - roundX0;
   
-  if (deltaY >= 0) //Line has positive or horizontal slope
+  if (deltaY >= 0) //Line has positive, undefined, or horizontal slope
   {
-    if (deltaX >= deltaY) //Line moves more right than up
+    if (deltaX >= deltaY) //Line moves more right than "up"
     {
       currY = roundY0;
       for (currX = roundX0; currX <= roundX1; currX++)
@@ -284,6 +285,35 @@ void SoftwareRendererImp::rasterize_line( float x0, float y0,
         if((epsilon << 1) >= deltaY)
         {
           currX ++; epsilon -= deltaY;
+        }
+      }
+    }
+  }
+  else //Line has negative slope
+  {
+    if (deltaX >= -deltaY) //Line moves more right than "down"
+    {
+      currY = roundY0;
+      for (currX = roundX0; currX <= roundX1; currX++) 
+      {
+        rasterize_point(currX,currY,color);
+        epsilon -= deltaY;
+        if ((epsilon << 1) >= deltaX)
+        {
+          currY--; epsilon-= deltaX;
+        }
+      }
+    }
+    else //Line moves more "down" than right
+    {
+      currX = roundX0;
+      for (currY = roundY0; currY >= roundY1; currY--)
+      {
+        rasterize_point(currX, currY, color);
+        epsilon += deltaX;
+        if ((epsilon << 1) >= -deltaY)
+        {
+          currX++; epsilon += deltaY;
         }
       }
     }
