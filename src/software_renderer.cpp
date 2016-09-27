@@ -61,14 +61,15 @@ void SoftwareRendererImp::set_sample_rate( size_t sample_rate ) {
 
   // Task 4: 
   // You may want to modify this for supersampling support
+  this->supersample_target_size = 4 *target_w * target_h * sample_rate * sample_rate;
   this->sample_rate = sample_rate;
   if (this->supersample_target != NULL)
   {
     delete [] this->supersample_target;
   }
   this->supersample_target = 
-    new unsigned char[(4 /* *sample_rate */ *target_w)*( /* sample_rate * */target_h)];
-  memset(supersample_target,255,4*target_w*target_h/* *sample_rate*sample_rate */);
+    new unsigned char[supersample_target_size];
+  memset(supersample_target,255,supersample_target_size);
 }
 
 void SoftwareRendererImp::set_render_target( unsigned char* render_target,
@@ -79,11 +80,12 @@ void SoftwareRendererImp::set_render_target( unsigned char* render_target,
   this->render_target = render_target;
   this->target_w = width;
   this->target_h = height;
+  this->supersample_target_size = 4 *target_w * target_h * sample_rate * sample_rate;
   if (this->supersample_target != NULL)
   {
     delete [] this->supersample_target;
   }
-  this->supersample_target = new unsigned char[4*target_w*target_h];
+  this->supersample_target = new unsigned char[this->supersample_target_size];
   memset(supersample_target,255,4*target_w*target_h);
 }
 
@@ -241,6 +243,23 @@ void SoftwareRendererImp::draw_group( Group& group ) {
 
 }
 
+void SoftwareRendererImp::fill_pixel(int x, int y, Color color) {
+  unsigned char* pixel_start = &(this->supersample_target[4 * sample_rate * sample_rate * (x + y * target_w)]);
+  int inner_offset;
+  DEBUG_ASSERT(4 * sample_rate * sample_rate * (x + y * target_w) + 4 * ((sample_rate - 1) + (sample_rate - 1) * sample_rate) + 3 < this->supersample_target_size);
+  for (int py = 0; py < sample_rate; py++)
+  {
+    for (int px = 0; px < sample_rate; px++)
+    {
+      inner_offset = 4 * (px + py * sample_rate);
+      pixel_start[inner_offset    ] = (uint8_t) (color.r * 255);
+      pixel_start[inner_offset + 1] = (uint8_t) (color.g * 255);
+      pixel_start[inner_offset + 2] = (uint8_t) (color.b * 255);
+      pixel_start[inner_offset + 3] = (uint8_t) (color.a * 255);
+    }
+  }
+}
+
 // Rasterization //
 
 // The input arguments in the rasterization functions 
@@ -258,12 +277,15 @@ void SoftwareRendererImp::rasterize_point( float x, float y, Color color ) {
   if ( sx < 0 || sx >= target_w ) return;
   if ( sy < 0 || sy >= target_h ) return;
 
+  fill_pixel(x,y,color);
+  
   // fill sample - NOT doing alpha blending!
+  /*
   supersample_target[offset    ] = (uint8_t) (color.r * 255);
   supersample_target[offset + 1] = (uint8_t) (color.g * 255);
   supersample_target[offset + 2] = (uint8_t) (color.b * 255);
   supersample_target[offset + 3] = (uint8_t) (color.a * 255);
-
+  */
 }
 
 void SoftwareRendererImp::rasterize_line( float x0, float y0,
@@ -350,6 +372,19 @@ void SoftwareRendererImp::rasterize_line( float x0, float y0,
 
 }
 
+void SoftwareRendererImp::rasterize_sample(int sampleX, int sampleY, Color color) {
+  DEBUG_ASSERT(this->supersample_target != NULL);
+  int x = sampleX / sample_rate;
+  int y = sampleY / sample_rate;
+  int px = sampleX % sample_rate;
+  int py = sampleY % sample_rate;
+  int offset = 4 * (sample_rate * sample_rate * (x + y * this->target_w) + (px + py * sample_rate));
+  this->supersample_target[offset    ] = (uint8_t) (color.r * 255);
+  this->supersample_target[offset + 1] = (uint8_t) (color.g * 255);
+  this->supersample_target[offset + 2] = (uint8_t) (color.b * 255);
+  this->supersample_target[offset + 3] = (uint8_t) (color.a * 255);
+}
+
 bool inEdge(float x0, float y0,
             float x1, float y1,
             float baseX, float baseY,
@@ -375,19 +410,26 @@ void SoftwareRendererImp::rasterize_triangle( float x0, float y0,
                                               Color color ) {
   // Task 3: 
   // Implement triangle rasterization
-  float minX = MIN(MIN(x0,x1),x2);
-  float maxX = MAX(MAX(x0,x1),x2);
-  float minY = MIN(MIN(y0,y1),y2);
-  float maxY = MAX(MAX(y0,y1),y2);
-  for (float currX = floor(minX) - .5; currX <= ceil(maxX) + .5; currX += 1)
+  float minX = MAX(MIN(MIN(x0,x1),x2),0.0);
+  float maxX = MIN(MAX(MAX(x0,x1),x2),target_w);
+  float minY = MAX(MIN(MIN(y0,y1),y2),0.0);
+  float maxY = MIN(MAX(MAX(y0,y1),y2),target_h);
+  //sampleX and sampleY mark sample point pixels in the supersample_target
+  for (int sampleX = int(floor(minX) * sample_rate); 
+       sampleX < (int) (ceil(maxX) * sample_rate); 
+       sampleX += 1)
   {
-    for (float currY = floor(minY) - .5; currY <= ceil(maxY) + .5; currY += 1)
+    for (int sampleY = int(floor(minY) * sample_rate);
+         sampleY < (int) (ceil(maxY)* sample_rate);
+         sampleY += 1)
     {
       //Could improve this by calculating side tests for triangle vertices
       //outside this loop
-      if (inTriangle(x0,y0,x1,y1,x2,y2,currX,currY))
+
+      //divide by sample_rate to get the actual x and y values that we are trying to test.
+      if (inTriangle(x0,y0,x1,y1,x2,y2,(sampleX+.5)/sample_rate,(sampleY+.5)/sample_rate))
       {
-        rasterize_point(currX,currY,color);
+        rasterize_sample(sampleX,sampleY,color);
       }
     }
   }
@@ -401,14 +443,31 @@ void SoftwareRendererImp::rasterize_image( float x0, float y0,
 
 }
 
-void SoftwareRendererImp::resolve_point(int x, int y)
+float SoftwareRendererImp::resolve_channel(int x, int y, int channel_offset)
+{
+  unsigned char* pixel_start = &(this->supersample_target[4 * sample_rate * sample_rate * (x + y * target_w) + channel_offset]);
+  float channel_sum = 0.0;
+  int inner_offset;
+  for (int channel_py = 0; channel_py < sample_rate; channel_py++)
+  {
+    for (int channel_px = 0; channel_px < sample_rate; channel_px++)
+    {
+      inner_offset = 4 * (channel_px + channel_py * sample_rate);
+      channel_sum += pixel_start[inner_offset];
+    }
+  }
+  return channel_sum/(sample_rate*sample_rate);
+}
+
+void SoftwareRendererImp::resolve_pixel(int x, int y)
 {
   DEBUG_ASSERT(this->supersample_target != NULL);
-  int offset = 4 * (x + y * this->target_w);
-  this->render_target[offset    ] = (uint8_t) this->supersample_target[offset    ];
-  this->render_target[offset + 1] = (uint8_t) this->supersample_target[offset + 1];
-  this->render_target[offset + 2] = (uint8_t) this->supersample_target[offset + 2];
-  this->render_target[offset + 3] = (uint8_t) this->supersample_target[offset + 3];
+  int render_offset = 4 * (x + y * this->target_w);
+  int offset = 4 * sample_rate * sample_rate * (x + y * this->target_w);
+  this->render_target[render_offset    ] = (uint8_t) resolve_channel(x, y, 0);
+  this->render_target[render_offset + 1] = (uint8_t) resolve_channel(x, y, 1);
+  this->render_target[render_offset + 2] = (uint8_t) resolve_channel(x, y, 2);
+  this->render_target[render_offset + 3] = (uint8_t) resolve_channel(x, y, 3);
 }
 
 // resolve samples to render target
@@ -417,15 +476,16 @@ void SoftwareRendererImp::resolve( void ) {
   // Task 4: 
   // Implement supersampling
   // You may also need to modify other functions marked with "Task 4".
+  memset(render_target, 255, 4 * target_w * target_h);
   DEBUG_ASSERT(supersample_target != NULL);
   for (int currX = 0; currX < target_w; currX++)
   {
     for (int currY = 0; currY < target_h; currY++)
     {
-      resolve_point(currX,currY);
+      resolve_pixel(currX,currY);
     }
   }
-  memset(supersample_target, 255, 4*target_w*target_h/**sample_rate*sample_rate*/);
+  memset(supersample_target, 255, 4*target_w*target_h*sample_rate*sample_rate);
   return;
 
 }

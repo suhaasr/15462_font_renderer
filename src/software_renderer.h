@@ -67,6 +67,7 @@ class SoftwareRendererImp : public SoftwareRenderer {
  protected:
   //supersample buffer
   unsigned char* supersample_target = NULL;
+  unsigned int supersample_target_size = 0;
 
  public:
 
@@ -118,10 +119,14 @@ class SoftwareRendererImp : public SoftwareRenderer {
   // rasterize a point
   void rasterize_point( float x, float y, Color color );
 
+  void fill_pixel( int x, int y, Color c );
+
   // rasterize a line
   void rasterize_line( float x0, float y0,
                        float x1, float y1,
                        Color color);
+
+  void rasterize_sample(int x, int y, Color color);
 
   // rasterize a triangle
   void rasterize_triangle( float x0, float y0,
@@ -134,7 +139,9 @@ class SoftwareRendererImp : public SoftwareRenderer {
                         float x1, float y1,
                         Texture& tex );
 
-  void resolve_point(int x, int y);
+  float resolve_channel(int x, int y, int channel_offset);
+
+  void resolve_pixel(int x, int y);
 
   // resolve samples to render target
   void resolve( void );
