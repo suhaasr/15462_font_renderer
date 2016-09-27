@@ -390,14 +390,23 @@ bool inEdge(float x0, float y0,
           ((x1-x0)*(baseY-y0) - (y1-y0)*(baseX-x0))) >= 0;
 }
 
+float lineSideTest(float testX,float testY,float x0,float y0,float x1,float y1)
+{
+  return (x1-x0)*(testY-y0) - (y1-y0)*(testX-x0);
+}
+
 bool inTriangle(float x0, float y0,
                 float x1, float y1, 
                 float x2, float y2, 
-                float testX, float testY)
+                float testX, float testY,
+                float p0Side, float p1Side, float p2Side)
 {
-  return (inEdge(x2,y2,x1,y1,x0,y0,testX,testY) &&
+  return (lineSideTest(testX,testY,x1,y1,x2,y2)*p0Side >= 0 &&
+          lineSideTest(testX,testY,x0,y0,x2,y2)*p1Side >= 0 &&
+          lineSideTest(testX,testY,x0,y0,x1,y1)*p2Side >= 0);
+          /*inEdge(x2,y2,x1,y1,x0,y0,testX,testY) &&
           inEdge(x1,y1,x0,y0,x2,y2,testX,testY) &&
-          inEdge(x2,y2,x0,y0,x1,y1,testX,testY));
+          inEdge(x2,y2,x0,y0,x1,y1,testX,testY));*/
 }
 
 void SoftwareRendererImp::rasterize_triangle( float x0, float y0,
@@ -411,6 +420,9 @@ void SoftwareRendererImp::rasterize_triangle( float x0, float y0,
   float minY = MAX(MIN(MIN(y0,y1),y2),0.0);
   float maxY = MIN(MAX(MAX(y0,y1),y2),target_h);
   //sampleX and sampleY mark sample point pixels in the supersample_target
+  float p0Side = lineSideTest(x0,y0,x1,y1,x2,y2);
+  float p1Side = lineSideTest(x1,y1,x0,y0,x2,y2);
+  float p2Side = lineSideTest(x2,y2,x0,y0,x1,y1);
   for (int sampleX = int(floor(minX) * sample_rate); 
        sampleX < (int) (ceil(maxX) * sample_rate); 
        sampleX += 1)
@@ -423,7 +435,7 @@ void SoftwareRendererImp::rasterize_triangle( float x0, float y0,
       //outside this loop
 
       //divide by sample_rate to get the actual x and y values that we are trying to test.
-      if (inTriangle(x0,y0,x1,y1,x2,y2,(sampleX+.5)/sample_rate,(sampleY+.5)/sample_rate))
+      if (inTriangle(x0,y0,x1,y1,x2,y2,(sampleX+.5)/sample_rate,(sampleY+.5)/sample_rate,p0Side,p1Side,p2Side))
       {
         rasterize_sample(sampleX,sampleY,color);
       }
