@@ -4,6 +4,18 @@
 #include <iostream>
 #include <algorithm>
 
+#define DEBUG
+
+#ifdef DEBUG
+#define DEBUG_ASSERT(x) (assert(x))
+#endif
+
+#ifndef DEBUG
+#define DEBUG_ASSERT(x)
+#endif
+
+#define FAIL (assert(1 == 0))
+
 using namespace std;
 
 namespace CMU462 {
@@ -84,8 +96,28 @@ Color Sampler2DImp::sample_nearest(Texture& tex,
   // Task 6: Implement nearest neighbour interpolation
   
   // return magenta for invalid level
+   if (level >= 0 && level <= 14) {
+    int x = (int) round(float(u*tex.mipmap[level].width));
+    int y = (int) round(float(v*tex.mipmap[level].height));
+    int offset = 4*(x+y*tex.mipmap[level].width);
+    float r = tex.mipmap[level].texels[offset    ];
+    float g = tex.mipmap[level].texels[offset + 1];
+    float b = tex.mipmap[level].texels[offset + 2];
+    float a = tex.mipmap[level].texels[offset + 3];
+    return Color(r/255.0,g/255.0,b/255.0,a/255.0);
+  }
+  // return magenta for invalid level
   return Color(1,0,1,1);
 
+}
+
+float interpolateX(int xLo, int xHi, int y, float loWeight, float hiWeight, MipLevel& texLevel, int colorOffset) {
+  int offset = 4*(xLo + y * texLevel.width) + colorOffset;
+  return texLevel.texels[offset] * loWeight + texLevel.texels[offset + 4*(xHi-xLo)] * hiWeight;
+}
+
+float interpolateVals(float val1, float val2, float loWeight, float hiWeight) {
+  return val1 * loWeight + val2 * hiWeight;
 }
 
 Color Sampler2DImp::sample_bilinear(Texture& tex, 
@@ -93,10 +125,40 @@ Color Sampler2DImp::sample_bilinear(Texture& tex,
                                     int level) {
   
   // Task 6: Implement bilinear filtering
-
-  // return magenta for invalid level
-  return Color(1,0,1,1);
-
+  if(u < 0 || u > 1 || v < 0 || v > 1 || level < 0 || level > 14) {
+    return Color(1,0,1,1); //return magenta for invalid level
+  }
+  //subtract .5 because pixel indices are offset .5 from their true coordinates
+  float texX = u * tex.mipmap[level].width - .5;
+  float texY = v * tex.mipmap[level].height - .5;
+  int xLo = (int) floor(texX);
+  int xHi = xLo + 1;
+  //int xHi = (int) ceil(texX);
+  int yLo = (int) floor(texY);
+  int yHi = yLo + 1;
+  //int yHi = (int) ceil(texY);
+  MipLevel& texLevel = tex.mipmap[level];
+  float hiXWeight = texX - xLo;
+  float loXWeight = 1 - hiXWeight;
+  float hiYWeight = texY - yLo;
+  float loYWeight = 1 - hiYWeight;
+  float red = interpolateVals(interpolateX(xLo, xHi, yLo, loXWeight, hiXWeight, texLevel, 0),
+                              interpolateX(xLo, xHi, yHi, loXWeight, hiXWeight, texLevel, 0),
+                              loYWeight,
+                              hiYWeight);
+  float green = interpolateVals(interpolateX(xLo, xHi, yLo, loXWeight, hiXWeight, texLevel, 1),
+                                interpolateX(xLo, xHi, yHi, loXWeight, hiXWeight, texLevel, 1),
+                                loYWeight,
+                                hiYWeight);
+  float blue = interpolateVals(interpolateX(xLo, xHi, yLo, loXWeight, hiXWeight, texLevel, 2),
+                               interpolateX(xLo, xHi, yHi, loXWeight, hiXWeight, texLevel, 2),
+                               loYWeight,
+                               hiYWeight);
+  float alpha = interpolateVals(interpolateX(xLo, xHi, yLo, loXWeight, hiXWeight, texLevel, 3),
+                                interpolateX(xLo, xHi, yHi, loXWeight, hiXWeight, texLevel, 3),
+                                loYWeight,
+                                hiYWeight);
+  return Color(red/255.0, green/255.0, blue/255.0, alpha/255.0);
 }
 
 Color Sampler2DImp::sample_trilinear(Texture& tex, 
@@ -104,9 +166,26 @@ Color Sampler2DImp::sample_trilinear(Texture& tex,
                                      float u_scale, float v_scale) {
 
   // Task 7: Implement trilinear filtering
-
-  // return magenta for invalid level
-  return Color(1,0,1,1);
+  float dvdy = v_scale * tex.height;
+  float dudx = u_scale * tex.width;
+  float d = log2f(fmax(dvdy, dudx));
+  float loWeight, hiWeight;
+  int loD, hiD;
+  Color hiColor, loColor;
+  if (d >= 0)
+  {
+    loD = (int) floor(d);
+    hiD = (int) ceil(d);
+    hiWeight = d-loD;
+    loWeight = 1-hiWeight;
+    loColor = sample_bilinear(tex,u,v,loD);
+    hiColor = sample_bilinear(tex,u,v,hiD);
+    return Color(loColor.r*loWeight + hiColor.r*hiWeight,
+                 loColor.g*loWeight + hiColor.g*hiWeight,
+                 loColor.b*loWeight + hiColor.b*hiWeight,
+                 loColor.a*loWeight + hiColor.a*hiWeight);
+  }
+  return sample_bilinear(tex,u,v,0);
 
 }
 

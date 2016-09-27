@@ -382,6 +382,7 @@ void SoftwareRendererImp::rasterize_sample(int sampleX, int sampleY, Color color
   int px = sampleX % sample_rate;
   int py = sampleY % sample_rate;
   int offset = 4 * (sample_rate * sample_rate * (x + y * this->target_w) + (px + py * sample_rate));
+  if (offset < 0 || offset >= supersample_target_size) return;
   this->supersample_target[offset    ] = (uint8_t) (color.r * 255);
   this->supersample_target[offset + 1] = (uint8_t) (color.g * 255);
   this->supersample_target[offset + 2] = (uint8_t) (color.b * 255);
@@ -443,7 +444,14 @@ void SoftwareRendererImp::rasterize_image( float x0, float y0,
                                            Texture& tex ) {
   // Task 6: 
   // Implement image rasterization
-
+  for(float x = MAX(0,x0)*sample_rate; x < MIN(target_w, x1)*sample_rate; x++) 
+  {
+    for(float y = MAX(0,y0)*sample_rate; y < MIN(target_w, y1)*sample_rate; y++) 
+    {
+      rasterize_sample(x,y,sampler->sample_trilinear(tex,(x/sample_rate-x0)/(x1-x0),(y/sample_rate-y0)/(y1-y0),1.0/(x1-x0),1.0/(y1-y0)));
+      //rasterize_sample(x,y,sampler->sample_nearest(tex,(x/sample_rate-x0)/(x1-x0),(y/sample_rate-y0)/(y1-y0),0));
+    }
+  }
 }
 
 float SoftwareRendererImp::resolve_channel(int x, int y, int channel_offset)
