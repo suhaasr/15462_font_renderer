@@ -7,6 +7,9 @@
 
 #include "triangulation.h"
 
+#define MAX(x,y) (((x)>(y))?(x):(y))
+#define MIN(x,y) (((x)<(y))?(x):(y))
+
 using namespace std;
 
 namespace CMU462 {
@@ -322,13 +325,47 @@ void SoftwareRendererImp::rasterize_line( float x0, float y0,
 
 }
 
+bool inEdge(float x0, float y0,
+            float x1, float y1,
+            float baseX, float baseY,
+            float testX, float testY)
+{
+  return (((x1-x0)*(testY-y0) - (y1-y0)*(testX-x0)) *
+          ((x1-x0)*(baseY-y0) - (y1-y0)*(baseX-x0))) >= 0;
+}
+
+bool inTriangle(float x0, float y0,
+                float x1, float y1, 
+                float x2, float y2, 
+                float testX, float testY)
+{
+  return (inEdge(x2,y2,x1,y1,x0,y0,testX,testY) &&
+          inEdge(x1,y1,x0,y0,x2,y2,testX,testY) &&
+          inEdge(x2,y2,x0,y0,x1,y1,testX,testY));
+}
+
 void SoftwareRendererImp::rasterize_triangle( float x0, float y0,
                                               float x1, float y1,
                                               float x2, float y2,
                                               Color color ) {
   // Task 3: 
   // Implement triangle rasterization
-
+  float minX = MIN(MIN(x0,x1),x2);
+  float maxX = MAX(MAX(x0,x1),x2);
+  float minY = MIN(MIN(y0,y1),y2);
+  float maxY = MAX(MAX(y0,y1),y2);
+  for (float currX = floor(minX) - .5; currX <= ceil(maxX) + .5; currX += 1)
+  {
+    for (float currY = floor(minY) - .5; currY <= ceil(maxY) + .5; currY += 1)
+    {
+      //Could improve this by calculating side tests for triangle vertices
+      //outside this loop
+      if (inTriangle(x0,y0,x1,y1,x2,y2,currX,currY))
+      {
+        rasterize_point(currX,currY,color);
+      }
+    }
+  }
 }
 
 void SoftwareRendererImp::rasterize_image( float x0, float y0,
