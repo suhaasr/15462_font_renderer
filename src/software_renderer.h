@@ -64,6 +64,10 @@ class SoftwareRenderer : public SVGRenderer {
 
 
 class SoftwareRendererImp : public SoftwareRenderer {
+ protected:
+  //supersample buffer
+  unsigned char* supersample_target = NULL;
+
  public:
 
   SoftwareRendererImp( ) : SoftwareRenderer( ) { }
@@ -129,6 +133,8 @@ class SoftwareRendererImp : public SoftwareRenderer {
   void rasterize_image( float x0, float y0,
                         float x1, float y1,
                         Texture& tex );
+
+  void resolve_point(int x, int y);
 
   // resolve samples to render target
   void resolve( void );
