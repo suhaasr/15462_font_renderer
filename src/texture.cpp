@@ -74,7 +74,7 @@ void Sampler2DImp::generate_mips(Texture& tex, int startLevel) {
     level.texels = vector<unsigned char>(4 * width * height);
 
   }
-
+  /*
   // fill all 0 sub levels with interchanging colors
   Color colors[3] = { Color(1,0,0,1), Color(0,1,0,1), Color(0,0,1,1) };
   for(size_t i = 1; i < tex.mipmap.size(); ++i) {
@@ -85,6 +85,35 @@ void Sampler2DImp::generate_mips(Texture& tex, int startLevel) {
     for(size_t i = 0; i < 4 * mip.width * mip.height; i += 4) {
       float_to_uint8( &mip.texels[i], &c.r );
     }
+  }
+  */
+  for(size_t i = 1; i < numSubLevels; ++i)
+  {
+    MipLevel& mip = tex.mipmap[i];
+    MipLevel& lowerMip = tex.mipmap[i-1];
+    float rSum, gSum, bSum, aSum;
+    for (size_t x = 0; x < mip.width; x += 1) 
+    {
+      for (size_t y = 0; y < mip.height; y += 1) 
+      {
+        rSum = gSum = bSum = aSum = 0.0;
+        for (size_t lowerLevelx = 2*x; lowerLevelx < 2*(x + 1); lowerLevelx += 1) 
+        {
+          for (size_t lowerLevely = 2*y; lowerLevely < 2*(y+1); lowerLevely += 1) 
+          {
+            int fourTimesXPlusYTimesTexMipmapWidth = 4*(lowerLevelx+lowerLevely*tex.mipmap[i-1].width);
+            rSum += lowerMip.texels[fourTimesXPlusYTimesTexMipmapWidth + 0];
+            gSum += lowerMip.texels[fourTimesXPlusYTimesTexMipmapWidth + 1];
+            bSum += lowerMip.texels[fourTimesXPlusYTimesTexMipmapWidth + 2];
+            aSum += lowerMip.texels[fourTimesXPlusYTimesTexMipmapWidth + 3];
+          }
+        }
+        mip.texels[4*(x+y*mip.width) + 0] = (uint8_t)(rSum/4.0);
+        mip.texels[4*(x+y*mip.width) + 1] = (uint8_t)(gSum/4.0);
+        mip.texels[4*(x+y*mip.width) + 2] = (uint8_t)(bSum/4.0);
+        mip.texels[4*(x+y*mip.width) + 3] = (uint8_t)(aSum/4.0);
+      }
+    }    
   }
 
 }

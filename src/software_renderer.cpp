@@ -254,11 +254,7 @@ void SoftwareRendererImp::fill_pixel(int x, int y, Color color) {
   {
     for (int px = 0; px < sample_rate; px++)
     {
-      inner_offset = 4 * (px + py * sample_rate);
-      pixel_start[inner_offset    ] = (uint8_t) (color.r * 255);
-      pixel_start[inner_offset + 1] = (uint8_t) (color.g * 255);
-      pixel_start[inner_offset + 2] = (uint8_t) (color.b * 255);
-      pixel_start[inner_offset + 3] = (uint8_t) (color.a * 255);
+      rasterize_sample(x*sample_rate+px, y*sample_rate+py, color);
     }
   }
 }
@@ -281,14 +277,6 @@ void SoftwareRendererImp::rasterize_point( float x, float y, Color color ) {
   if ( sy < 0 || sy >= target_h ) return;
 
   fill_pixel(x,y,color);
-  
-  // fill sample - NOT doing alpha blending!
-  /*
-  supersample_target[offset    ] = (uint8_t) (color.r * 255);
-  supersample_target[offset + 1] = (uint8_t) (color.g * 255);
-  supersample_target[offset + 2] = (uint8_t) (color.b * 255);
-  supersample_target[offset + 3] = (uint8_t) (color.a * 255);
-  */
 }
 
 void SoftwareRendererImp::rasterize_line( float x0, float y0,
@@ -383,10 +371,14 @@ void SoftwareRendererImp::rasterize_sample(int sampleX, int sampleY, Color color
   int py = sampleY % sample_rate;
   int offset = 4 * (sample_rate * sample_rate * (x + y * this->target_w) + (px + py * sample_rate));
   if (offset < 0 || offset >= supersample_target_size) return;
-  this->supersample_target[offset    ] = (uint8_t) (color.r * 255);
-  this->supersample_target[offset + 1] = (uint8_t) (color.g * 255);
-  this->supersample_target[offset + 2] = (uint8_t) (color.b * 255);
-  this->supersample_target[offset + 3] = (uint8_t) (color.a * 255);
+  float oldR = this->supersample_target[offset    ];
+  float oldG = this->supersample_target[offset + 1];
+  float oldB = this->supersample_target[offset + 2];
+  float oldA = this->supersample_target[offset + 3];
+  this->supersample_target[offset    ] = (uint8_t) (((1 - color.a) * oldR/255.0 + color.r * color.a)*255);
+  this->supersample_target[offset + 1] = (uint8_t) (((1 - color.a) * oldG/255.0 + color.g * color.a)*255);
+  this->supersample_target[offset + 2] = (uint8_t) (((1 - color.a) * oldB/255.0 + color.b * color.a)*255);
+  this->supersample_target[offset + 3] = (uint8_t) ((1-(1-color.a)*(1-oldA/255.0))*255);
 }
 
 bool inEdge(float x0, float y0,
@@ -449,7 +441,6 @@ void SoftwareRendererImp::rasterize_image( float x0, float y0,
     for(float y = MAX(0,y0)*sample_rate; y < MIN(target_w, y1)*sample_rate; y++) 
     {
       rasterize_sample(x,y,sampler->sample_trilinear(tex,(x/sample_rate-x0)/(x1-x0),(y/sample_rate-y0)/(y1-y0),1.0/(x1-x0),1.0/(y1-y0)));
-      //rasterize_sample(x,y,sampler->sample_nearest(tex,(x/sample_rate-x0)/(x1-x0),(y/sample_rate-y0)/(y1-y0),0));
     }
   }
 }
