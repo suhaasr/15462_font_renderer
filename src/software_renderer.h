@@ -66,7 +66,8 @@ class SoftwareRenderer : public SVGRenderer {
 class SoftwareRendererImp : public SoftwareRenderer {
  protected:
   //supersample buffer
-  unsigned char* supersample_target = NULL;
+  std::vector <unsigned char> supersample_target;
+  //unsigned char* supersample_target = NULL;
   unsigned int supersample_target_size = 0;
 
  public:

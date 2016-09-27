@@ -11,7 +11,7 @@
 #define MAX(x,y) (((x)>(y))?(x):(y))
 #define MIN(x,y) (((x)<(y))?(x):(y))
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #define DEBUG_ASSERT(x) (assert(x))
@@ -63,13 +63,9 @@ void SoftwareRendererImp::set_sample_rate( size_t sample_rate ) {
   // You may want to modify this for supersampling support
   this->supersample_target_size = 4 *target_w * target_h * sample_rate * sample_rate;
   this->sample_rate = sample_rate;
-  if (this->supersample_target != NULL)
-  {
-    delete [] this->supersample_target;
-  }
-  this->supersample_target = 
-    new unsigned char[supersample_target_size];
-  memset(supersample_target,255,supersample_target_size);
+  this->supersample_target.resize(this->supersample_target_size);
+  std::fill(this->supersample_target.begin(), this->supersample_target.end(), 255);
+
 }
 
 void SoftwareRendererImp::set_render_target( unsigned char* render_target,
@@ -81,12 +77,8 @@ void SoftwareRendererImp::set_render_target( unsigned char* render_target,
   this->target_w = width;
   this->target_h = height;
   this->supersample_target_size = 4 *target_w * target_h * sample_rate * sample_rate;
-  if (this->supersample_target != NULL)
-  {
-    delete [] this->supersample_target;
-  }
-  this->supersample_target = new unsigned char[this->supersample_target_size];
-  memset(supersample_target,255,4*target_w*target_h);
+  this->supersample_target.resize(this->supersample_target_size);
+  std::fill(this->supersample_target.begin(), this->supersample_target.end(), 255);
 }
 
 void SoftwareRendererImp::draw_element( SVGElement* element ) {
@@ -267,7 +259,6 @@ void SoftwareRendererImp::fill_pixel(int x, int y, Color color) {
 void SoftwareRendererImp::rasterize_point( float x, float y, Color color ) {
 
   // fill in the nearest pixel
-  DEBUG_ASSERT(this->supersample_target != NULL);
   int sx = (int) floor(x);
   int sy = (int) floor(y);
   int offset = 4 * (sx + sy * target_w);
@@ -364,7 +355,6 @@ void SoftwareRendererImp::rasterize_line( float x0, float y0,
 }
 
 void SoftwareRendererImp::rasterize_sample(int sampleX, int sampleY, Color color) {
-  DEBUG_ASSERT(this->supersample_target != NULL);
   int x = sampleX / sample_rate;
   int y = sampleY / sample_rate;
   int px = sampleX % sample_rate;
@@ -390,12 +380,12 @@ bool inEdge(float x0, float y0,
           ((x1-x0)*(baseY-y0) - (y1-y0)*(baseX-x0))) >= 0;
 }
 
-float lineSideTest(float testX,float testY,float x0,float y0,float x1,float y1)
+static inline float lineSideTest(float testX,float testY,float x0,float y0,float x1,float y1)
 {
   return (x1-x0)*(testY-y0) - (y1-y0)*(testX-x0);
 }
 
-bool inTriangle(float x0, float y0,
+static inline bool inTriangle(float x0, float y0,
                 float x1, float y1, 
                 float x2, float y2, 
                 float testX, float testY,
@@ -404,9 +394,6 @@ bool inTriangle(float x0, float y0,
   return (lineSideTest(testX,testY,x1,y1,x2,y2)*p0Side >= 0 &&
           lineSideTest(testX,testY,x0,y0,x2,y2)*p1Side >= 0 &&
           lineSideTest(testX,testY,x0,y0,x1,y1)*p2Side >= 0);
-          /*inEdge(x2,y2,x1,y1,x0,y0,testX,testY) &&
-          inEdge(x1,y1,x0,y0,x2,y2,testX,testY) &&
-          inEdge(x2,y2,x0,y0,x1,y1,testX,testY));*/
 }
 
 void SoftwareRendererImp::rasterize_triangle( float x0, float y0,
@@ -475,7 +462,6 @@ float SoftwareRendererImp::resolve_channel(int x, int y, int channel_offset)
 
 void SoftwareRendererImp::resolve_pixel(int x, int y)
 {
-  DEBUG_ASSERT(this->supersample_target != NULL);
   int render_offset = 4 * (x + y * this->target_w);
   int offset = 4 * sample_rate * sample_rate * (x + y * this->target_w);
   this->render_target[render_offset    ] = (uint8_t) resolve_channel(x, y, 0);
@@ -491,7 +477,6 @@ void SoftwareRendererImp::resolve( void ) {
   // Implement supersampling
   // You may also need to modify other functions marked with "Task 4".
   memset(render_target, 255, 4 * target_w * target_h);
-  DEBUG_ASSERT(supersample_target != NULL);
   for (int currX = 0; currX < target_w; currX++)
   {
     for (int currY = 0; currY < target_h; currY++)
@@ -499,9 +484,8 @@ void SoftwareRendererImp::resolve( void ) {
       resolve_pixel(currX,currY);
     }
   }
-  memset(supersample_target, 255, 4*target_w*target_h*sample_rate*sample_rate);
+  std::fill(this->supersample_target.begin(), this->supersample_target.end(), 255);
   return;
-
 }
 
 
