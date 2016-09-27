@@ -244,7 +244,9 @@ void HardwareRenderer::rasterize_point(float x, float y, Color color) {
   
   // Task 1: 
   // Implement point rasterization
-  glColor3f(color.r,color.g,color.b);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+  glColor4f(color.r,color.g,color.b,color.a);
   glBegin(GL_POINTS);
   glVertex2f(x,y);
   glEnd();
@@ -257,7 +259,9 @@ void HardwareRenderer::rasterize_line(float x0, float y0,
 
   // Task 1: 
   // Implement line rasterization
-  glColor3f(color.r,color.g,color.b);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+  glColor4f(color.r,color.g,color.b,color.a);
   glBegin(GL_LINES);
   glVertex2f(x0,y0);
   glVertex2f(x1,y1);
@@ -271,7 +275,9 @@ void HardwareRenderer::rasterize_triangle(float x0, float y0,
                                           Color color) {
   // Task 1: 
   // Implement triangle rasterization
-  glColor3f(color.r, color.g, color.b);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+  glColor4f(color.r, color.g, color.b,color.a);
   glBegin(GL_TRIANGLES);
   glVertex2f(x0,y0);
   glVertex2f(x1,y1);
@@ -283,6 +289,8 @@ void HardwareRenderer::rasterize_triangle(float x0, float y0,
 void HardwareRenderer::rasterize_image(float x0, float y0,
                                        float x1, float y1,
                                        Texture& tex) {
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
   glColor4f(1, 1, 1, 1);
   
   size_t w = tex.mipmap[0].width;
