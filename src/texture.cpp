@@ -140,12 +140,12 @@ Color Sampler2DImp::sample_nearest(Texture& tex,
 
 }
 
-float interpolateX(int xLo, int xHi, int y, float loWeight, float hiWeight, MipLevel& texLevel, int colorOffset) {
+static inline float interpolateX(int xLo, int xHi, int y, float loWeight, float hiWeight, MipLevel& texLevel, int colorOffset) {
   int offset = 4*(xLo + y * texLevel.width) + colorOffset;
   return texLevel.texels[offset] * loWeight + texLevel.texels[offset + 4*(xHi-xLo)] * hiWeight;
 }
 
-float interpolateVals(float val1, float val2, float loWeight, float hiWeight) {
+static inline float interpolateVals(float val1, float val2, float loWeight, float hiWeight) {
   return val1 * loWeight + val2 * hiWeight;
 }
 
@@ -154,18 +154,16 @@ Color Sampler2DImp::sample_bilinear(Texture& tex,
                                     int level) {
   
   // Task 6: Implement bilinear filtering
-  if(u < 0 || u > 1 || v < 0 || v > 1 || level < 0 || level > 14) {
+  if(u < 0 || u > 1 || v < 0 || v > 1 || level < 0 || level >= tex.mipmap.size()) {
     return Color(1,0,1,1); //return magenta for invalid level
   }
   //subtract .5 because pixel indices are offset .5 from their true coordinates
   float texX = u * tex.mipmap[level].width - .5;
   float texY = v * tex.mipmap[level].height - .5;
   int xLo = (int) floor(texX);
-  int xHi = xLo + 1;
-  //int xHi = (int) ceil(texX);
+  int xHi = (int) ceil(texX);
   int yLo = (int) floor(texY);
-  int yHi = yLo + 1;
-  //int yHi = (int) ceil(texY);
+  int yHi = (int) ceil(texY);
   MipLevel& texLevel = tex.mipmap[level];
   float hiXWeight = texX - xLo;
   float loXWeight = 1 - hiXWeight;
